@@ -397,7 +397,20 @@ class BinLogStreamReader(object):
                 # valid, if not, get the current position from master
                 if self.log_file is None or self.log_pos is None:
                     cur = self._stream_connection.cursor()
-                    cur.execute("SHOW MASTER STATUS")
+
+                    if self.mysql_version == (0, 0, 0):
+                        cur.execute("SELECT VERSION()")
+                        version = cur.fetchone()
+                        if version is None: raise
+                        self.mysql_version = tuple(
+                            [int(x) for x in version[:1][0].split(".")[:3]]
+                        )
+                        
+                    if self.mysql_version >= (8, 4, 0):
+                        cur.execute("SHOW BINARY LOG STATUS")
+                    else:
+                        cur.execute("SHOW MASTER STATUS")
+
                     master_status = cur.fetchone()
                     if master_status is None:
                         raise BinLogNotEnabled()
